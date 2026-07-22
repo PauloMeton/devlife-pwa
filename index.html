@@ -1,0 +1,1163 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1">
+<title>DevLife</title>
+<meta name="description" content="Hábitos, estudos, treino e evolução pessoal em um HUD só.">
+<meta name="theme-color" content="#12151C">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="DevLife">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon.svg">
+<style>
+/* ============ TOKENS ============ */
+:root{
+  --bg:#12151C;
+  --bg-elev:#171B24;
+  --surface:#1B2029;
+  --surface-2:#222836;
+  --border:#2A303C;
+  --text:#EDEFF3;
+  --text-dim:#8B93A7;
+  --text-faint:#545B6B;
+  --accent:#C6FF4B;
+  --accent-dim:#8FCB2E;
+  --accent-ink:#12180A;
+  --accent-2:#FF7A59;
+  --accent-3:#FFB020;
+  --danger:#FF5D5D;
+  --font-display: ui-monospace, "Cascadia Code", "JetBrains Mono", "SFMono-Regular", Consolas, monospace;
+  --font-body: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --radius-lg:18px;
+  --radius-md:12px;
+  --radius-sm:8px;
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+}
+[data-theme="light"]{
+  --bg:#F1F3EE;
+  --bg-elev:#FFFFFF;
+  --surface:#FFFFFF;
+  --surface-2:#E7EBE2;
+  --border:#D9DED2;
+  --text:#171B24;
+  --text-dim:#5B6270;
+  --text-faint:#8B93A7;
+  --accent:#5C9A1B;
+  --accent-dim:#4A7D16;
+  --accent-ink:#F4FFE0;
+  --accent-2:#D9502F;
+  --accent-3:#B8790A;
+  --danger:#C93A3A;
+}
+*{box-sizing:border-box;}
+html,body{height:100%;}
+body{
+  margin:0;
+  background:var(--bg);
+  color:var(--text);
+  font-family:var(--font-body);
+  -webkit-font-smoothing:antialiased;
+  overscroll-behavior-y:none;
+}
+button, input, select, textarea{font-family:inherit;}
+::selection{ background:var(--accent); color:var(--accent-ink); }
+
+/* ============ SHELL ============ */
+#shell{
+  max-width:480px;
+  margin:0 auto;
+  min-height:100vh;
+  display:flex;
+  flex-direction:column;
+  background:var(--bg);
+  position:relative;
+}
+.topbar{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  padding: calc(14px + var(--safe-top)) 18px 12px;
+  position:sticky; top:0; z-index:20;
+  background:linear-gradient(var(--bg) 70%, transparent);
+}
+.brand{
+  display:flex; align-items:center; gap:10px;
+  font-family:var(--font-display);
+  font-weight:700;
+  letter-spacing:0.02em;
+  font-size:15px;
+}
+.brand .mark{
+  width:26px;height:26px;border-radius:7px;
+  background:var(--surface-2);
+  display:flex; align-items:end; justify-content:center; gap:2px;
+  padding:4px 5px 3px;
+  border:1px solid var(--border);
+}
+.brand .mark i{ display:block; width:4px; background:var(--accent); border-radius:2px; }
+.brand .mark i:nth-child(1){height:5px; background:var(--accent-dim);}
+.brand .mark i:nth-child(2){height:9px;}
+.brand .mark i:nth-child(3){height:13px;}
+.streakpill{
+  display:flex; align-items:center; gap:6px;
+  font-family:var(--font-display); font-size:12.5px; color:var(--accent-3);
+  background:var(--surface); border:1px solid var(--border);
+  padding:5px 10px; border-radius:999px;
+}
+.topbar-actions{ display:flex; gap:8px; align-items:center; }
+.iconbtn{
+  width:34px;height:34px; border-radius:10px;
+  border:1px solid var(--border); background:var(--surface);
+  color:var(--text-dim); display:flex; align-items:center; justify-content:center;
+  cursor:pointer;
+}
+.iconbtn:active{ transform:scale(0.94); }
+
+#view-root{
+  flex:1;
+  padding: 4px 18px calc(96px + var(--safe-bottom));
+  animation: fadein .18s ease;
+}
+@keyframes fadein{ from{opacity:0; transform:translateY(4px);} to{opacity:1; transform:none;} }
+
+/* ============ BOTTOM NAV ============ */
+.bottomnav{
+  position:fixed; left:50%; transform:translateX(-50%);
+  bottom: calc(14px + var(--safe-bottom));
+  width:calc(100% - 36px); max-width:444px;
+  display:flex; justify-content:space-between;
+  background:var(--surface); border:1px solid var(--border);
+  border-radius:20px; padding:7px;
+  box-shadow:0 10px 30px rgba(0,0,0,0.35);
+  z-index:30;
+}
+[data-theme="light"] .bottomnav{ box-shadow:0 10px 24px rgba(0,0,0,0.12); }
+.navbtn{
+  flex:1; display:flex; flex-direction:column; align-items:center; gap:3px;
+  padding:8px 2px 7px; border:none; background:transparent; color:var(--text-faint);
+  border-radius:14px; cursor:pointer; font-size:10.5px; font-family:var(--font-body);
+}
+.navbtn svg{ width:20px; height:20px; }
+.navbtn.active{ color:var(--accent); background:var(--surface-2); }
+
+/* ============ CARDS / PRIMITIVES ============ */
+.card{
+  background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-lg);
+  padding:16px; margin-bottom:12px;
+}
+.card-title{
+  font-family:var(--font-display); font-size:11px; letter-spacing:0.08em; text-transform:uppercase;
+  color:var(--text-faint); margin:0 0 10px;
+}
+h1.page-title{
+  font-family:var(--font-display); font-size:20px; font-weight:700; margin:14px 0 14px;
+  letter-spacing:-0.01em;
+}
+.btn{
+  display:inline-flex; align-items:center; justify-content:center; gap:8px;
+  padding:11px 16px; border-radius:var(--radius-md); border:1px solid var(--border);
+  background:var(--surface-2); color:var(--text); font-weight:600; font-size:14px; cursor:pointer;
+}
+.btn:active{ transform:scale(0.98); }
+.btn-primary{ background:var(--accent); color:var(--accent-ink); border-color:var(--accent); }
+.btn-ghost{ background:transparent; }
+.btn-block{ width:100%; }
+.btn-danger{ color:var(--danger); border-color:var(--danger); background:transparent; }
+.btn-sm{ padding:7px 12px; font-size:12.5px; border-radius:10px; }
+
+.field{ margin-bottom:14px; }
+.field label{ display:block; font-size:12px; color:var(--text-dim); margin-bottom:6px; }
+.field input, .field select, .field textarea{
+  width:100%; padding:11px 12px; border-radius:var(--radius-md); border:1px solid var(--border);
+  background:var(--bg-elev); color:var(--text); font-size:14.5px;
+}
+.field textarea{ resize:vertical; min-height:70px; }
+.row{ display:flex; gap:10px; }
+.row > *{ flex:1; }
+
+/* ============ XP BAR (signature element) ============ */
+.xpbar-wrap{ margin-top:10px; }
+.xpbar-track{
+  height:14px; border-radius:999px; background:var(--surface-2);
+  border:1px solid var(--border); overflow:hidden; position:relative;
+  display:flex; gap:3px; padding:2px;
+}
+.xpbar-seg{
+  flex:1; border-radius:999px; background:var(--bg-elev);
+  position:relative; overflow:hidden;
+}
+.xpbar-seg.filled{ background:var(--accent); box-shadow:0 0 10px var(--accent); }
+.xpbar-seg.partial > i{
+  display:block; height:100%; background:var(--accent); box-shadow:0 0 10px var(--accent);
+  transition:width .5s ease;
+}
+.xpbar-label{
+  display:flex; justify-content:space-between; margin-top:7px;
+  font-family:var(--font-display); font-size:11.5px; color:var(--text-dim);
+}
+
+/* ============ STAT GRID ============ */
+.statgrid{ display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:12px; }
+.statcard{
+  background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-md);
+  padding:12px 14px;
+}
+.statcard .v{ font-family:var(--font-display); font-size:19px; font-weight:700; }
+.statcard .l{ font-size:11px; color:var(--text-dim); margin-top:2px; }
+.statcard.accent .v{ color:var(--accent); }
+.statcard.warn .v{ color:var(--accent-3); }
+.statcard.rose .v{ color:var(--accent-2); }
+
+/* ============ HABIT ROW ============ */
+.habit-row{
+  display:flex; align-items:center; gap:12px;
+  padding:12px; border:1px solid var(--border); border-radius:var(--radius-md);
+  background:var(--surface); margin-bottom:9px;
+}
+.habit-check{
+  width:30px; height:30px; border-radius:9px; border:2px solid var(--border);
+  background:var(--bg-elev); flex-shrink:0; cursor:pointer;
+  display:flex; align-items:center; justify-content:center;
+  transition:transform .15s ease;
+}
+.habit-check.done{
+  background:var(--accent); border-color:var(--accent); color:var(--accent-ink);
+  animation:pop .28s ease;
+}
+@keyframes pop{ 0%{transform:scale(0.7);} 60%{transform:scale(1.15);} 100%{transform:scale(1);} }
+.habit-info{ flex:1; min-width:0; }
+.habit-name{ font-size:14.5px; font-weight:600; }
+.habit-meta{ font-size:11.5px; color:var(--text-dim); margin-top:2px; display:flex; gap:8px; align-items:center;}
+.tag{
+  font-family:var(--font-display); font-size:10px; padding:2px 7px; border-radius:6px;
+  border:1px solid var(--border); color:var(--text-dim);
+}
+.tag.prog{ color:var(--accent); border-color:var(--accent-dim); }
+.tag.saude{ color:var(--accent-2); border-color:var(--accent-2); }
+.habit-xp{ font-family:var(--font-display); font-size:11.5px; color:var(--accent-3); white-space:nowrap; }
+.habit-del{ background:none; border:none; color:var(--text-faint); cursor:pointer; padding:4px; }
+
+/* ============ EMPTY STATE ============ */
+.empty{
+  text-align:center; padding:34px 16px; color:var(--text-dim);
+}
+.empty .glyph{ font-size:26px; margin-bottom:8px; }
+.empty .t{ font-weight:600; color:var(--text); margin-bottom:4px; }
+.empty .s{ font-size:13px; }
+
+/* ============ MODAL ============ */
+.modal-backdrop{
+  position:fixed; inset:0; background:rgba(0,0,0,0.55); z-index:100;
+  display:flex; align-items:flex-end; justify-content:center;
+  animation:fadein .15s ease;
+}
+.modal-sheet{
+  width:100%; max-width:480px; background:var(--bg-elev);
+  border-radius:22px 22px 0 0; border:1px solid var(--border); border-bottom:none;
+  padding:18px 18px calc(22px + var(--safe-bottom)); max-height:88vh; overflow-y:auto;
+}
+.modal-handle{ width:36px; height:4px; background:var(--border); border-radius:99px; margin:0 auto 14px; }
+.modal-title{ font-family:var(--font-display); font-size:16px; font-weight:700; margin:0 0 16px; }
+
+/* ============ SEGMENTED CONTROL ============ */
+.segmented{ display:flex; background:var(--surface-2); border-radius:var(--radius-md); padding:4px; gap:4px; margin-bottom:14px; }
+.segmented button{
+  flex:1; padding:9px 4px; border:none; background:transparent; color:var(--text-dim);
+  border-radius:9px; font-size:12.5px; font-weight:600; cursor:pointer;
+}
+.segmented button.active{ background:var(--accent); color:var(--accent-ink); }
+
+/* ============ TIMER ============ */
+.timer-ring-wrap{ display:flex; justify-content:center; margin:18px 0 8px; }
+.timer-display{ font-family:var(--font-display); font-size:52px; font-weight:700; text-align:center; letter-spacing:-0.02em; }
+.timer-label{ text-align:center; color:var(--text-dim); font-size:13px; margin-top:2px; margin-bottom:20px; }
+.timer-controls{ display:flex; gap:10px; justify-content:center; }
+.timer-presets{ display:flex; gap:8px; margin:16px 0; }
+.timer-presets button{
+  flex:1; padding:10px 4px; border-radius:var(--radius-sm); border:1px solid var(--border);
+  background:var(--surface); color:var(--text-dim); font-family:var(--font-display); font-size:12px; cursor:pointer;
+}
+.timer-presets button.active{ border-color:var(--accent); color:var(--accent); background:var(--surface-2); }
+
+/* ============ CALENDAR ============ */
+.cal-grid{ display:grid; grid-template-columns:repeat(7,1fr); gap:6px; }
+.cal-dow{ text-align:center; font-size:10px; color:var(--text-faint); font-family:var(--font-display); padding-bottom:4px; }
+.cal-day{
+  aspect-ratio:1; border-radius:9px; background:var(--surface); border:1px solid var(--border);
+  display:flex; flex-direction:column; align-items:center; justify-content:center; font-size:12px; color:var(--text-dim);
+  position:relative; min-width:0; min-height:0;
+}
+.cal-day.empty{ background:transparent; border-color:transparent; }
+.cal-day .dot{ width:5px; height:5px; border-radius:50%; background:var(--accent); margin-top:3px; }
+.cal-day.today{ border-color:var(--accent); color:var(--text); font-weight:700;}
+.cal-day.full{ background:var(--surface-2); }
+
+/* ============ CHART ============ */
+.chart-wrap{ width:100%; }
+.chart-wrap svg{ width:100%; height:auto; display:block; }
+.chart-legend{ display:flex; gap:14px; margin-top:8px; font-size:11.5px; color:var(--text-dim); }
+.chart-legend span{ display:inline-flex; align-items:center; gap:5px; }
+.chart-legend i{ width:8px; height:8px; border-radius:2px; display:inline-block; }
+
+/* ============ ACHIEVEMENT ============ */
+.ach-grid{ display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+.ach{
+  border:1px solid var(--border); border-radius:var(--radius-md); padding:12px; background:var(--surface);
+  text-align:center; opacity:0.4;
+}
+.ach.unlocked{ opacity:1; border-color:var(--accent-dim); }
+.ach .glyph{ font-size:22px; margin-bottom:6px; }
+.ach .t{ font-size:12px; font-weight:700; }
+.ach .s{ font-size:10.5px; color:var(--text-dim); margin-top:2px; }
+
+/* ============ LIST ITEM (logs) ============ */
+.log-item{
+  display:flex; justify-content:space-between; align-items:center;
+  padding:11px 0; border-bottom:1px solid var(--border);
+}
+.log-item:last-child{ border-bottom:none; }
+.log-main{ font-size:13.5px; font-weight:600; }
+.log-sub{ font-size:11.5px; color:var(--text-dim); margin-top:1px; }
+.log-val{ font-family:var(--font-display); font-size:13px; color:var(--accent); text-align:right; }
+
+/* ============ TOAST ============ */
+#toast{
+  position:fixed; left:50%; transform:translateX(-50%); bottom:calc(100px + var(--safe-bottom));
+  background:var(--accent); color:var(--accent-ink); padding:11px 18px; border-radius:999px;
+  font-weight:700; font-size:13.5px; z-index:200; opacity:0; pointer-events:none;
+  transition:opacity .25s ease, transform .25s ease; white-space:nowrap;
+  box-shadow:0 8px 24px rgba(0,0,0,0.3);
+}
+#toast.show{ opacity:1; transform:translate(-50%, -6px); }
+
+/* ============ FAB ============ */
+.fab{
+  position:fixed; right:calc(50% - 222px + 16px); bottom:calc(96px + var(--safe-bottom));
+  width:52px; height:52px; border-radius:16px; background:var(--accent); color:var(--accent-ink);
+  border:none; font-size:26px; display:flex; align-items:center; justify-content:center;
+  box-shadow:0 10px 24px rgba(198,255,75,0.25); cursor:pointer; z-index:25;
+}
+@media (max-width:480px){ .fab{ right:20px; } }
+
+/* ============ ONBOARDING ============ */
+.onb-wrap{
+  position:fixed; inset:0; background:var(--bg); z-index:300; display:flex; flex-direction:column;
+  padding:calc(30px + var(--safe-top)) 26px calc(26px + var(--safe-bottom));
+  max-width:480px; margin:0 auto;
+}
+.onb-mark{ width:56px;height:56px;border-radius:16px; background:var(--surface-2); border:1px solid var(--border);
+  display:flex; align-items:end; justify-content:center; gap:4px; padding:10px 10px 8px; margin-bottom:20px;}
+.onb-mark i{ display:block; width:8px; background:var(--accent); border-radius:3px; }
+.onb-mark i:nth-child(1){height:12px; background:var(--accent-dim);}
+.onb-mark i:nth-child(2){height:22px;}
+.onb-mark i:nth-child(3){height:32px;}
+.onb-title{ font-family:var(--font-display); font-size:26px; font-weight:700; margin:0 0 8px; letter-spacing:-0.01em;}
+.onb-sub{ color:var(--text-dim); font-size:14.5px; line-height:1.5; margin-bottom:28px; }
+
+/* scrollbar tidy */
+::-webkit-scrollbar{ width:0; height:0; }
+
+.small-note{ font-size:11.5px; color:var(--text-faint); line-height:1.5; }
+.section-gap{ height:6px; }
+</style>
+</head>
+<body>
+<div id="shell">
+  <header class="topbar">
+    <div class="brand"><span class="mark"><i></i><i></i><i></i></span> DEVLIFE</div>
+    <div class="topbar-actions">
+      <div class="streakpill" id="streak-pill">🔥 0</div>
+      <button class="iconbtn" id="theme-toggle" title="Alternar tema">◐</button>
+    </div>
+  </header>
+  <main id="view-root"></main>
+  <button class="fab" id="fab-add" title="Adicionar">+</button>
+  <nav class="bottomnav" id="bottomnav"></nav>
+</div>
+<div id="modal-container"></div>
+<div id="toast"></div>
+
+<script>
+/* ==================================================================
+   DEVLIFE — app único (sem backend). Dados ficam no localStorage
+   do navegador onde este arquivo estiver hospedado.
+   ================================================================== */
+
+const STORAGE_KEY = "devlife_state_v1";
+
+const ICONS = {
+  dashboard: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12 12 3l9 9"/><path d="M5 10v10h14V10"/><path d="M9 20v-6h6v6"/></svg>',
+  habitos: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16"/><path d="M4 12h16"/><path d="M4 18h10"/><path d="m17 16 2 2 3-3"/></svg>',
+  timer: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l3 2"/><path d="M9 2h6"/></svg>',
+  registros: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h9l5 5v13a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1Z"/><path d="M14 3v5h5"/><path d="M8 13h8M8 17h5"/></svg>',
+  mais: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></svg>',
+  back: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>',
+  trash: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16"/><path d="M6 7v13a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1V7"/><path d="M9 7V4h6v3"/></svg>',
+  check: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12l5 5L20 6"/></svg>',
+  chevron: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></svg>',
+};
+
+const NAV_ITEMS = [
+  { id: "dashboard", label: "Início", icon: "dashboard" },
+  { id: "habitos", label: "Hábitos", icon: "habitos" },
+  { id: "timer", label: "Timer", icon: "timer" },
+  { id: "registros", label: "Registros", icon: "registros" },
+  { id: "mais", label: "Mais", icon: "mais" },
+];
+const MAIS_GROUP = ["mais", "calendario", "estatisticas", "conquistas", "perfil"];
+
+const CATEGORIA_HABITO = {
+  "Programação": { tagClass: "prog", icones: ["💻","⌨️","🧠","🗂️","🐛","📦"] },
+  "Saúde": { tagClass: "saude", icones: ["🏋️","🏃","🚶","💧","😴","🥗"] },
+};
+
+const ACHIEVEMENTS = [
+  { id:"primeiro-habito", t:"Primeiro Passo", s:"Criou o primeiro hábito", g:"🌱", cond:(st)=> st.habitos.length>=1 },
+  { id:"primeiro-estudo", t:"Primeiro Estudo", s:"Registrou uma sessão de estudo", g:"📘", cond:(st)=> st.estudos.length>=1 },
+  { id:"primeiro-treino", t:"Bora Treinar", s:"Registrou um treino", g:"🏋️", cond:(st)=> st.treinos.length>=1 },
+  { id:"primeira-semana", t:"Primeira Semana", s:"7 dias consecutivos", g:"🔥", cond:(st)=> computeStreak(st)>=7 },
+  { id:"trinta-dias", t:"30 Dias", s:"30 dias consecutivos", g:"🏆", cond:(st)=> computeStreak(st)>=30 },
+  { id:"cinquenta-horas", t:"50 Horas Estudadas", s:"Somando estudo + foco", g:"⏱️", cond:(st)=> totalMinutosMapa(st.tempoEstudadoPorDia) >= 50*60 },
+  { id:"cinco-kg", t:"5 kg Perdidos", s:"Comparando 1º e último registro", g:"⚖️", cond:(st)=> pesoPerdido(st) >= 5 },
+  { id:"nivel-5", t:"Nível 5", s:"Chegou ao nível 5", g:"⭐", cond:(st)=> st.nivel>=5 },
+  { id:"cem-tarefas", t:"100 Tarefas", s:"100 conclusões de hábitos", g:"💯", cond:(st)=> totalConclusoes(st) >= 100 },
+];
+
+/* ---------------- estado / storage ---------------- */
+function defaultState(){
+  return {
+    version:1, tema:"dark", profile:null,
+    nivel:1, xpAtual:0, xpTotal:0, moedas:0,
+    habitos:[], estudos:[], treinos:[], pesos:[], diario:[], alimentacao:[],
+    tempoEstudadoPorDia:{}, tempoTreinadoPorDia:{}, xpLogPorDia:{},
+    conquistasDesbloqueadas:[], notificacoesAtivas:false,
+  };
+}
+let STORAGE_OK = true;
+function loadState(){
+  try{
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if(raw) return Object.assign(defaultState(), JSON.parse(raw));
+  }catch(e){ STORAGE_OK = false; }
+  return defaultState();
+}
+function saveState(){
+  try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
+  catch(e){ STORAGE_OK = false; }
+}
+let state = loadState();
+
+/* ---------------- utils ---------------- */
+function uid(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,7); }
+function todayStr(d){ const dt = d||new Date(); return dt.getFullYear()+"-"+String(dt.getMonth()+1).padStart(2,"0")+"-"+String(dt.getDate()).padStart(2,"0"); }
+function addDays(dateStr, n){ const d = new Date(dateStr+"T00:00:00"); d.setDate(d.getDate()+n); return todayStr(d); }
+function fmtDataBR(dateStr){ const [y,m,d]=dateStr.split("-"); return `${d}/${m}/${y}`; }
+function clamp(v,min,max){ return Math.max(min,Math.min(max,v)); }
+function esc(s){ return (s||"").replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function minutosParaHhMm(min){ min=Math.round(min||0); const h=Math.floor(min/60), m=min%60; return h>0? `${h}h${String(m).padStart(2,"0")}` : `${m}min`; }
+function toast(msg){
+  const el = document.getElementById("toast");
+  el.textContent = msg; el.classList.add("show");
+  clearTimeout(toast._t);
+  toast._t = setTimeout(()=> el.classList.remove("show"), 2200);
+}
+
+/* ---------------- XP / nível ---------------- */
+function requiredXP(level){
+  if(level<=1) return 100;
+  if(level===2) return 250;
+  if(level===3) return 500;
+  return 500 + (level-3)*250;
+}
+function addXP(amount){
+  if(!amount) return;
+  state.xpAtual += amount; state.xpTotal += amount;
+  const dia = todayStr();
+  state.xpLogPorDia[dia] = (state.xpLogPorDia[dia]||0) + amount;
+  let leveled = false;
+  while(state.xpAtual >= requiredXP(state.nivel)){
+    state.xpAtual -= requiredXP(state.nivel);
+    state.nivel += 1;
+    leveled = true;
+  }
+  if(leveled) toast(`🎉 Subiu para o Nível ${state.nivel}!`);
+}
+function addMoedas(n){ state.moedas += n; }
+
+/* ---------------- streak ---------------- */
+function diasAtivos(st){
+  const set = new Set();
+  st.habitos.forEach(h => Object.keys(h.historico||{}).forEach(d => { if(h.historico[d]) set.add(d); }));
+  return set;
+}
+function computeStreak(st){
+  const ativos = diasAtivos(st);
+  if(ativos.size===0) return 0;
+  let cursor = ativos.has(todayStr()) ? todayStr() : addDays(todayStr(),-1);
+  let count = 0;
+  while(ativos.has(cursor)){ count++; cursor = addDays(cursor,-1); }
+  return count;
+}
+function totalMinutosMapa(mapa){ return Object.values(mapa||{}).reduce((a,b)=>a+b,0); }
+function totalConclusoes(st){
+  let n=0; st.habitos.forEach(h => n += Object.values(h.historico||{}).filter(Boolean).length);
+  return n;
+}
+function pesoPerdido(st){
+  if(st.pesos.length<2) return 0;
+  const ordenado = [...st.pesos].sort((a,b)=> a.data.localeCompare(b.data));
+  const primeiro = ordenado[0].peso, ultimo = ordenado[ordenado.length-1].peso;
+  return Math.max(0, primeiro - ultimo);
+}
+function imc(pesoKg, alturaCm){
+  if(!alturaCm) return null;
+  const m = alturaCm/100;
+  return pesoKg/(m*m);
+}
+
+/* ---------------- conquistas ---------------- */
+function checkAchievements(){
+  const novas = [];
+  ACHIEVEMENTS.forEach(a=>{
+    const already = state.conquistasDesbloqueadas.includes(a.id);
+    if(!already && a.cond(state)){
+      state.conquistasDesbloqueadas.push(a.id);
+      novas.push(a);
+    }
+  });
+  novas.forEach(a=> toast(`🏆 Conquista: ${a.t}`));
+  return novas;
+}
+
+/* ---------------- roteador ---------------- */
+let currentScreen = "dashboard";
+let registrosTab = "estudos";
+
+function setScreen(name){
+  currentScreen = name;
+  renderNav();
+  renderView();
+  document.getElementById("view-root").scrollTop = 0;
+  window.scrollTo(0,0);
+}
+function renderNav(){
+  const nav = document.getElementById("bottomnav");
+  nav.innerHTML = NAV_ITEMS.map(item=>{
+    const active = (item.id==="mais") ? MAIS_GROUP.includes(currentScreen) : currentScreen===item.id;
+    return `<button class="navbtn ${active?"active":""}" data-nav="${item.id}">${ICONS[item.icon]}<span>${item.label}</span></button>`;
+  }).join("");
+  nav.querySelectorAll("[data-nav]").forEach(btn=>{
+    btn.addEventListener("click", ()=> setScreen(btn.dataset.nav==="mais" ? "mais" : btn.dataset.nav));
+  });
+  const fab = document.getElementById("fab-add");
+  fab.style.display = (currentScreen==="habitos" || currentScreen==="registros") ? "flex" : "none";
+}
+
+/* ---------------- modal helpers ---------------- */
+function openModal(html){
+  const c = document.getElementById("modal-container");
+  c.innerHTML = `<div class="modal-backdrop" id="modal-backdrop"><div class="modal-sheet">
+    <div class="modal-handle"></div>${html}</div></div>`;
+  document.getElementById("modal-backdrop").addEventListener("click", (e)=>{
+    if(e.target.id==="modal-backdrop") closeModal();
+  });
+}
+function closeModal(){ document.getElementById("modal-container").innerHTML=""; }
+
+/* ================= VIEWS ================= */
+function renderView(){
+  const root = document.getElementById("view-root");
+  if(currentScreen==="dashboard") root.innerHTML = viewDashboard();
+  else if(currentScreen==="habitos") root.innerHTML = viewHabitos();
+  else if(currentScreen==="timer") root.innerHTML = viewTimer();
+  else if(currentScreen==="registros") root.innerHTML = viewRegistros();
+  else if(currentScreen==="mais") root.innerHTML = viewMais();
+  else if(currentScreen==="calendario") root.innerHTML = viewCalendario();
+  else if(currentScreen==="estatisticas") root.innerHTML = viewEstatisticas();
+  else if(currentScreen==="conquistas") root.innerHTML = viewConquistas();
+  else if(currentScreen==="perfil") root.innerHTML = viewPerfil();
+  bindViewEvents();
+  document.getElementById("streak-pill").textContent = `🔥 ${computeStreak(state)}`;
+}
+
+function subHeader(title){
+  return `<div style="display:flex;align-items:center;gap:10px;margin:14px 0;">
+    <button class="iconbtn" data-back>${ICONS.back}</button>
+    <h1 class="page-title" style="margin:0;">${title}</h1>
+  </div>`;
+}
+
+/* ---- DASHBOARD ---- */
+function viewDashboard(){
+  const req = requiredXP(state.nivel);
+  const pct = clamp(state.xpAtual/req, 0, 1);
+  const segCount = 10;
+  const segsHtml = Array.from({length:segCount}).map((_,i)=>{
+    const segPct = clamp(pct*segCount - i, 0, 1);
+    if(segPct>=0.999) return `<div class="xpbar-seg filled"></div>`;
+    if(segPct<=0.001) return `<div class="xpbar-seg"></div>`;
+    return `<div class="xpbar-seg partial"><i style="width:${(segPct*100).toFixed(0)}%"></i></div>`;
+  }).join("");
+
+  const hoje = todayStr();
+  const pesoAtual = state.pesos.length ? [...state.pesos].sort((a,b)=>b.data.localeCompare(a.data))[0].peso : (state.profile?.pesoAtual || null);
+  const minEstudo = state.tempoEstudadoPorDia[hoje] || 0;
+  const minTreino = state.tempoTreinadoPorDia[hoje] || 0;
+  const habitosHoje = state.habitos;
+  const feitosHoje = habitosHoje.filter(h => h.historico && h.historico[hoje]).length;
+  const pendentes = habitosHoje.filter(h => !(h.historico && h.historico[hoje]));
+
+  return `
+    <h1 class="page-title">Olá${state.profile? ", "+esc(state.profile.nome.split(" ")[0]) : ""} 👋</h1>
+    <div class="card">
+      <div class="card-title">Nível ${state.nivel}</div>
+      <div class="xpbar-wrap">
+        <div class="xpbar-track">${segsHtml}</div>
+        <div class="xpbar-label"><span>${state.xpAtual} XP</span><span>${req} XP p/ nível ${state.nivel+1}</span></div>
+      </div>
+    </div>
+    <div class="statgrid">
+      <div class="statcard accent"><div class="v">${state.moedas}</div><div class="l">Moedas</div></div>
+      <div class="statcard warn"><div class="v">${computeStreak(state)}</div><div class="l">Dias consecutivos</div></div>
+      <div class="statcard"><div class="v">${pesoAtual!=null? pesoAtual.toFixed(1)+" kg" : "—"}</div><div class="l">Peso atual</div></div>
+      <div class="statcard rose"><div class="v">${feitosHoje}/${habitosHoje.length||0}</div><div class="l">Meta do dia</div></div>
+      <div class="statcard"><div class="v">${minutosParaHhMm(minEstudo)}</div><div class="l">Estudado hoje</div></div>
+      <div class="statcard"><div class="v">${minutosParaHhMm(minTreino)}</div><div class="l">Treinado hoje</div></div>
+    </div>
+    <div class="card">
+      <div class="card-title">Próximas tarefas</div>
+      ${pendentes.length===0 ? `<div class="empty" style="padding:18px 8px;"><div class="glyph">✅</div><div class="t">Tudo em dia</div><div class="s">Nenhum hábito pendente hoje.</div></div>` :
+        pendentes.slice(0,5).map(h=> habitRowHtml(h, hoje)).join("")}
+      ${pendentes.length===0 && habitosHoje.length===0 ? `<div class="small-note" style="margin-top:8px;">Vá em <b>Hábitos</b> e crie o primeiro pra começar a ganhar XP.</div>`:""}
+    </div>
+  `;
+}
+
+function habitRowHtml(h, dateStr){
+  const done = !!(h.historico && h.historico[dateStr]);
+  const cat = CATEGORIA_HABITO[h.categoria] || CATEGORIA_HABITO["Programação"];
+  return `<div class="habit-row">
+    <button class="habit-check ${done?"done":""}" data-toggle-habit="${h.id}" data-date="${dateStr}">${done?ICONS.check:""}</button>
+    <div class="habit-info">
+      <div class="habit-name">${h.icone||"⭐"} ${esc(h.nome)}</div>
+      <div class="habit-meta"><span class="tag ${cat.tagClass}">${h.categoria}</span><span class="habit-xp">+${h.xp} XP</span></div>
+    </div>
+    <button class="habit-del" data-del-habit="${h.id}">${ICONS.trash}</button>
+  </div>`;
+}
+
+/* ---- HÁBITOS ---- */
+function viewHabitos(){
+  const hoje = todayStr();
+  return `
+    <h1 class="page-title">Hábitos</h1>
+    ${state.habitos.length===0 ? `<div class="empty"><div class="glyph">🌱</div><div class="t">Nenhum hábito ainda</div><div class="s">Toque no + para criar o primeiro.</div></div>` :
+      `<div>${state.habitos.map(h=>habitRowHtml(h, hoje)).join("")}</div>`}
+  `;
+}
+
+function modalNovoHabito(){
+  openModal(`
+    <div class="modal-title">Novo hábito</div>
+    <div class="field"><label>Nome</label><input id="f-nome" placeholder="Ex: Estudar Java" maxlength="40"></div>
+    <div class="field"><label>Categoria</label>
+      <select id="f-categoria">
+        <option value="Programação">Programação</option>
+        <option value="Saúde">Saúde</option>
+      </select>
+    </div>
+    <div class="field"><label>Ícone</label>
+      <select id="f-icone"></select>
+    </div>
+    <div class="field"><label>XP por conclusão</label><input id="f-xp" type="number" value="15" min="5" max="100" step="5"></div>
+    <button class="btn btn-primary btn-block" id="f-salvar">Criar hábito</button>
+  `);
+  const catSel = document.getElementById("f-categoria");
+  const iconSel = document.getElementById("f-icone");
+  function fillIcons(){ iconSel.innerHTML = CATEGORIA_HABITO[catSel.value].icones.map(i=>`<option>${i}</option>`).join(""); }
+  fillIcons();
+  catSel.addEventListener("change", fillIcons);
+  document.getElementById("f-salvar").addEventListener("click", ()=>{
+    const nome = document.getElementById("f-nome").value.trim();
+    if(!nome){ toast("Digite um nome pro hábito"); return; }
+    state.habitos.push({
+      id:uid(), nome, categoria:catSel.value, icone:iconSel.value,
+      xp: parseInt(document.getElementById("f-xp").value)||15,
+      criadoEm: todayStr(), historico:{}
+    });
+    checkAchievements(); saveState(); closeModal(); renderView();
+    toast("Hábito criado!");
+  });
+}
+
+/* ---- TIMER (Pomodoro) ---- */
+const pomodoro = { presetMin:25, secondsLeft:25*60, running:false, intervalId:null };
+function viewTimer(){
+  const mm = String(Math.floor(pomodoro.secondsLeft/60)).padStart(2,"0");
+  const ss = String(pomodoro.secondsLeft%60).padStart(2,"0");
+  return `
+    <h1 class="page-title">Cronômetro</h1>
+    <div class="card">
+      <div class="timer-presets">
+        ${[25,5,15].map(m=>`<button data-preset="${m}" class="${pomodoro.presetMin===m?"active":""}">${m} min</button>`).join("")}
+        <button data-preset="custom" class="${![25,5,15].includes(pomodoro.presetMin)?"active":""}">Custom</button>
+      </div>
+      <div class="timer-display">${mm}:${ss}</div>
+      <div class="timer-label">${pomodoro.running? "Em andamento…" : "Pronto pra focar?"}</div>
+      <div class="timer-controls">
+        <button class="btn ${pomodoro.running?"btn-ghost":"btn-primary"}" id="timer-toggle">${pomodoro.running?"Pausar":"Iniciar"}</button>
+        <button class="btn btn-ghost" id="timer-reset">Reiniciar</button>
+      </div>
+    </div>
+    <div class="small-note">Ao concluir uma sessão, o tempo é somado ao "estudado hoje" e você ganha XP.</div>
+  `;
+}
+function pomodoroTick(){
+  pomodoro.secondsLeft--;
+  if(pomodoro.secondsLeft<=0){
+    clearInterval(pomodoro.intervalId); pomodoro.running=false; pomodoro.secondsLeft=0;
+    const hoje = todayStr();
+    state.tempoEstudadoPorDia[hoje] = (state.tempoEstudadoPorDia[hoje]||0) + pomodoro.presetMin;
+    addXP(Math.round(pomodoro.presetMin*1.2)); addMoedas(Math.round(pomodoro.presetMin/5));
+    checkAchievements(); saveState();
+    toast("⏰ Sessão concluída!");
+    if("Notification" in window && Notification.permission==="granted"){
+      try{ new Notification("DevLife", { body:"Sessão de foco concluída. Bora descansar 5 min?", icon:"icon.svg" }); }catch(e){}
+    }
+    pomodoro.secondsLeft = pomodoro.presetMin*60;
+  }
+  if(currentScreen==="timer") renderView();
+}
+
+/* ---- REGISTROS ---- */
+const REGISTRO_TABS = [
+  { id:"estudos", label:"Estudo" }, { id:"treinos", label:"Treino" },
+  { id:"pesos", label:"Peso" }, { id:"diario", label:"Diário" }, { id:"alimentacao", label:"Alimentação" },
+];
+function viewRegistros(){
+  const items = [...state[registrosTab]].sort((a,b)=> b.data.localeCompare(a.data)).slice(0,20);
+  return `
+    <h1 class="page-title">Registros</h1>
+    <div class="segmented">
+      ${REGISTRO_TABS.map(t=>`<button data-regtab="${t.id}" class="${registrosTab===t.id?"active":""}">${t.label}</button>`).join("")}
+    </div>
+    <div class="card">
+      ${items.length===0 ? `<div class="empty"><div class="glyph">🗒️</div><div class="t">Nada registrado ainda</div><div class="s">Toque no + para adicionar.</div></div>` :
+        items.map(it => registroItemHtml(registrosTab, it)).join("")}
+    </div>
+  `;
+}
+function registroItemHtml(tab, it){
+  let main="", sub="", val="";
+  if(tab==="estudos"){ main = esc(it.disciplina||it.curso); sub = `${esc(it.curso)} · ${fmtDataBR(it.data)}`; val = minutosParaHhMm(it.horas*60); }
+  else if(tab==="treinos"){ main = esc(it.tipo); sub = `${fmtDataBR(it.data)}${it.distanciaKm?` · ${it.distanciaKm}km`:""}`; val = minutosParaHhMm(it.tempoMin); }
+  else if(tab==="pesos"){ main = it.peso.toFixed(1)+" kg"; sub = fmtDataBR(it.data); val = state.profile?.alturaCm ? `IMC ${imc(it.peso,state.profile.alturaCm).toFixed(1)}` : ""; }
+  else if(tab==="diario"){ main = fmtDataBR(it.data); sub = esc((it.texto||"").slice(0,60)); val=""; }
+  else if(tab==="alimentacao"){ main = esc(it.refeicao); sub = fmtDataBR(it.data); val = `${it.calorias} kcal`; }
+  return `<div class="log-item">
+    <div><div class="log-main">${main}</div><div class="log-sub">${sub}</div></div>
+    <div style="display:flex;align-items:center;gap:10px;"><div class="log-val">${val}</div>
+    <button class="habit-del" data-del-registro="${tab}:${it.id}">${ICONS.trash}</button></div>
+  </div>`;
+}
+
+function modalNovoRegistro(){
+  const tab = registrosTab;
+  let body="";
+  if(tab==="estudos"){
+    body = `<div class="field"><label>Curso</label><input id="f-curso" placeholder="Ex: Alura, FMF..."></div>
+      <div class="field"><label>Disciplina / linguagem</label><input id="f-disciplina" placeholder="Ex: Java"></div>
+      <div class="field"><label>Horas estudadas</label><input id="f-horas" type="number" step="0.25" min="0.25" value="1"></div>`;
+  } else if(tab==="treinos"){
+    body = `<div class="field"><label>Tipo</label><select id="f-tipo"><option>Academia</option><option>Corrida</option><option>Caminhada</option><option>Bicicleta</option></select></div>
+      <div class="row"><div class="field"><label>Tempo (min)</label><input id="f-tempo" type="number" min="1" value="30"></div>
+      <div class="field"><label>Distância (km)</label><input id="f-dist" type="number" step="0.1" value="0"></div></div>
+      <div class="field"><label>Calorias</label><input id="f-cal" type="number" value="0"></div>`;
+  } else if(tab==="pesos"){
+    body = `<div class="field"><label>Peso (kg)</label><input id="f-peso" type="number" step="0.1" placeholder="Ex: 72.5"></div>`;
+  } else if(tab==="diario"){
+    body = `<div class="field"><label>Como foi seu dia?</label><textarea id="f-texto" placeholder="Hoje eu..."></textarea></div>`;
+  } else if(tab==="alimentacao"){
+    body = `<div class="field"><label>Refeição</label><select id="f-refeicao"><option>Café da manhã</option><option>Almoço</option><option>Lanche</option><option>Jantar</option></select></div>
+      <div class="field"><label>Calorias (aprox.)</label><input id="f-calref" type="number" value="0"></div>`;
+  }
+  openModal(`<div class="modal-title">Novo registro — ${REGISTRO_TABS.find(t=>t.id===tab).label}</div>${body}
+    <button class="btn btn-primary btn-block" id="f-salvar-registro">Salvar</button>`);
+  document.getElementById("f-salvar-registro").addEventListener("click", ()=>{
+    const hoje = todayStr();
+    if(tab==="estudos"){
+      const horas = parseFloat(document.getElementById("f-horas").value)||0;
+      if(horas<=0){ toast("Informe as horas"); return; }
+      state.estudos.push({ id:uid(), data:hoje, curso:document.getElementById("f-curso").value||"Estudo", disciplina:document.getElementById("f-disciplina").value||"", horas });
+      state.tempoEstudadoPorDia[hoje] = (state.tempoEstudadoPorDia[hoje]||0) + horas*60;
+      addXP(Math.round(horas*20)); addMoedas(Math.round(horas*4));
+    } else if(tab==="treinos"){
+      const tempoMin = parseInt(document.getElementById("f-tempo").value)||0;
+      if(tempoMin<=0){ toast("Informe o tempo"); return; }
+      state.treinos.push({ id:uid(), data:hoje, tipo:document.getElementById("f-tipo").value, tempoMin,
+        distanciaKm:parseFloat(document.getElementById("f-dist").value)||0, calorias:parseInt(document.getElementById("f-cal").value)||0 });
+      state.tempoTreinadoPorDia[hoje] = (state.tempoTreinadoPorDia[hoje]||0) + tempoMin;
+      addXP(Math.round(tempoMin/2)); addMoedas(Math.round(tempoMin/6));
+    } else if(tab==="pesos"){
+      const peso = parseFloat(document.getElementById("f-peso").value);
+      if(!peso){ toast("Informe o peso"); return; }
+      state.pesos.push({ id:uid(), data:hoje, peso });
+      addXP(10);
+    } else if(tab==="diario"){
+      const texto = document.getElementById("f-texto").value.trim();
+      if(!texto){ toast("Escreva algo"); return; }
+      state.diario.push({ id:uid(), data:hoje, texto });
+      addXP(5);
+    } else if(tab==="alimentacao"){
+      state.alimentacao.push({ id:uid(), data:hoje, refeicao:document.getElementById("f-refeicao").value, calorias:parseInt(document.getElementById("f-calref").value)||0 });
+      addXP(5);
+    }
+    checkAchievements(); saveState(); closeModal(); renderView();
+    toast("Registrado!");
+  });
+}
+
+/* ---- MAIS (menu) ---- */
+function viewMais(){
+  const menu = [
+    { id:"calendario", label:"Calendário", s:"Dias concluídos no mês" },
+    { id:"estatisticas", label:"Estatísticas", s:"Peso, XP e horas ao longo do tempo" },
+    { id:"conquistas", label:"Conquistas", s:`${state.conquistasDesbloqueadas.length}/${ACHIEVEMENTS.length} desbloqueadas` },
+    { id:"perfil", label:"Perfil e configurações", s:"Tema, dados, LGPD" },
+  ];
+  return `<h1 class="page-title">Mais</h1>
+    <div class="card" style="padding:6px 16px;">
+      ${menu.map((m,i)=>`<div class="log-item" data-goto="${m.id}" style="cursor:pointer;">
+        <div><div class="log-main">${m.label}</div><div class="log-sub">${m.s}</div></div>
+        <div style="color:var(--text-faint);">${ICONS.chevron}</div>
+      </div>`).join("")}
+    </div>`;
+}
+
+/* ---- CALENDÁRIO ---- */
+let calMonthOffset = 0;
+function viewCalendario(){
+  const now = new Date(); now.setMonth(now.getMonth()+calMonthOffset);
+  const y = now.getFullYear(), m = now.getMonth();
+  const first = new Date(y,m,1);
+  const startWeekday = first.getDay();
+  const daysInMonth = new Date(y,m+1,0).getDate();
+  const ativos = diasAtivos(state);
+  const totalHabitos = state.habitos.length;
+  const monthName = now.toLocaleDateString("pt-BR", { month:"long", year:"numeric" });
+
+  let cells = "";
+  for(let i=0;i<startWeekday;i++) cells += `<div class="cal-day empty"></div>`;
+  for(let d=1; d<=daysInMonth; d++){
+    const dateStr = `${y}-${String(m+1).padStart(2,"0")}-${String(d).padStart(2,"0")}`;
+    const isToday = dateStr===todayStr();
+    const active = ativos.has(dateStr);
+    let feitos = 0;
+    state.habitos.forEach(h=>{ if(h.historico && h.historico[dateStr]) feitos++; });
+    const full = totalHabitos>0 && feitos===totalHabitos;
+    cells += `<div class="cal-day ${isToday?"today":""} ${full?"full":""}">${d}${active?`<span class="dot"></span>`:""}</div>`;
+  }
+  return `
+    ${subHeader("Calendário")}
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+        <button class="iconbtn" data-cal-prev>${ICONS.back}</button>
+        <div class="card-title" style="margin:0;text-transform:capitalize;">${monthName}</div>
+        <button class="iconbtn" data-cal-next style="transform:rotate(180deg);">${ICONS.back}</button>
+      </div>
+      <div class="cal-grid">
+        ${["D","S","T","Q","Q","S","S"].map(d=>`<div class="cal-dow">${d}</div>`).join("")}
+        ${cells}
+      </div>
+      <div class="small-note" style="margin-top:12px;">● dia com pelo meno um hábito concluído. Fundo destacado = todos os hábitos do dia concluídos.</div>
+    </div>
+  `;
+}
+
+/* ---- ESTATÍSTICAS ---- */
+function lineChartSvg(points, color, opts){
+  opts = opts||{};
+  const w=300,h=120,pad=10;
+  if(points.length===0) return `<div class="empty" style="padding:20px;"><div class="s">Sem dados ainda</div></div>`;
+  const values = points.map(p=>p.v);
+  const min = Math.min(...values), max = Math.max(...values);
+  const range = (max-min)||1;
+  const stepX = (w-pad*2)/Math.max(1,points.length-1);
+  const coords = points.map((p,i)=>{
+    const x = pad + i*stepX;
+    const y = h-pad - ((p.v-min)/range)*(h-pad*2);
+    return [x,y];
+  });
+  const path = coords.map((c,i)=> (i===0?"M":"L")+c[0].toFixed(1)+","+c[1].toFixed(1)).join(" ");
+  const areaPath = path + ` L${coords[coords.length-1][0].toFixed(1)},${h-pad} L${coords[0][0].toFixed(1)},${h-pad} Z`;
+  const lastPt = coords[coords.length-1];
+  return `<svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none">
+    <path d="${areaPath}" fill="${color}" opacity="0.12" stroke="none"></path>
+    <path d="${path}" fill="none" stroke="${color}" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"></path>
+    <circle cx="${lastPt[0].toFixed(1)}" cy="${lastPt[1].toFixed(1)}" r="3.5" fill="${color}"></circle>
+  </svg>`;
+}
+function barChartSvg(points, color){
+  const w=300,h=120,pad=8;
+  if(points.length===0) return `<div class="empty" style="padding:20px;"><div class="s">Sem dados ainda</div></div>`;
+  const max = Math.max(...points.map(p=>p.v), 1);
+  const bw = (w-pad*2)/points.length*0.6;
+  const gap = (w-pad*2)/points.length;
+  const bars = points.map((p,i)=>{
+    const bh = (p.v/max)*(h-pad*2);
+    const x = pad + i*gap + (gap-bw)/2;
+    const y = h-pad-bh;
+    return `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${bw.toFixed(1)}" height="${bh.toFixed(1)}" rx="3" fill="${color}"></rect>`;
+  }).join("");
+  return `<svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none">${bars}</svg>`;
+}
+function lastNDates(n){ const arr=[]; for(let i=n-1;i>=0;i--) arr.push(addDays(todayStr(),-i)); return arr; }
+
+function viewEstatisticas(){
+  const pesos = [...state.pesos].sort((a,b)=>a.data.localeCompare(b.data)).slice(-14).map(p=>({v:p.peso}));
+  const dias14 = lastNDates(14);
+  const xpPts = dias14.map(d=>({v: state.xpLogPorDia[d]||0}));
+  const estudoPts = lastNDates(7).map(d=>({v: Math.round((state.tempoEstudadoPorDia[d]||0)/60*10)/10}));
+
+  return `
+    ${subHeader("Estatísticas")}
+    <div class="card">
+      <div class="card-title">Peso (últimos registros)</div>
+      <div class="chart-wrap">${lineChartSvg(pesos, "var(--accent-2)".includes("var")? "#FF7A59":"#FF7A59")}</div>
+    </div>
+    <div class="card">
+      <div class="card-title">XP ganho por dia (14 dias)</div>
+      <div class="chart-wrap">${barChartSvg(xpPts, "#C6FF4B")}</div>
+    </div>
+    <div class="card">
+      <div class="card-title">Horas estudadas por dia (7 dias)</div>
+      <div class="chart-wrap">${barChartSvg(estudoPts, "#4DA3FF")}</div>
+      <div class="chart-legend"><span><i style="background:#4DA3FF"></i>horas</span></div>
+    </div>
+  `;
+}
+
+/* ---- CONQUISTAS ---- */
+function viewConquistas(){
+  return `
+    ${subHeader("Conquistas")}
+    <div class="ach-grid">
+      ${ACHIEVEMENTS.map(a=>{
+        const unlocked = state.conquistasDesbloqueadas.includes(a.id);
+        return `<div class="ach ${unlocked?"unlocked":""}"><div class="glyph">${a.g}</div><div class="t">${a.t}</div><div class="s">${a.s}</div></div>`;
+      }).join("")}
+    </div>
+  `;
+}
+
+/* ---- PERFIL ---- */
+function viewPerfil(){
+  const p = state.profile || {};
+  return `
+    ${subHeader("Perfil")}
+    <div class="card">
+      <div class="card-title">Dados</div>
+      <div class="field"><label>Nome</label><input id="p-nome" value="${esc(p.nome||"")}"></div>
+      <div class="row">
+        <div class="field"><label>Altura (cm)</label><input id="p-altura" type="number" value="${p.alturaCm||""}"></div>
+        <div class="field"><label>Peso desejado (kg)</label><input id="p-pesodes" type="number" step="0.1" value="${p.pesoDesejado||""}"></div>
+      </div>
+      <button class="btn btn-primary btn-block" id="p-salvar">Salvar</button>
+    </div>
+    <div class="card">
+      <div class="card-title">Notificações</div>
+      <button class="btn btn-block" id="p-notif">${state.notificacoesAtivas? "Notificações ativadas ✓" : "Ativar lembrete local"}</button>
+      <div class="small-note" style="margin-top:8px;">Lembrete simples enquanto o app está aberto. Notificações push de verdade (com o app fechado) exigem um servidor — fora do escopo deste protótipo sem backend.</div>
+    </div>
+    <div class="card">
+      <div class="card-title">Privacidade (LGPD)</div>
+      <div class="small-note" style="margin-bottom:10px;">Todos os seus dados ficam só neste dispositivo/navegador — nada é enviado a servidor nenhum.</div>
+      <div class="row">
+        <button class="btn" id="p-exportar">Exportar dados (.json)</button>
+        <button class="btn btn-danger" id="p-apagar">Apagar tudo</button>
+      </div>
+    </div>
+    <div class="small-note" style="text-align:center;">DevLife · protótipo PWA · v1.0</div>
+  `;
+}
+
+/* ---------------- eventos por view ---------------- */
+function bindViewEvents(){
+  document.querySelectorAll("[data-toggle-habit]").forEach(btn=>{
+    btn.addEventListener("click", ()=>{
+      const h = state.habitos.find(x=>x.id===btn.dataset.toggleHabit);
+      const date = btn.dataset.date;
+      if(!h) return;
+      h.historico = h.historico||{};
+      if(h.historico[date]){
+        delete h.historico[date];
+        state.xpAtual -= h.xp; if(state.xpAtual<0){ if(state.nivel>1){state.nivel--; state.xpAtual+=requiredXP(state.nivel);} else state.xpAtual=0; }
+        state.moedas = Math.max(0, state.moedas - Math.round(h.xp/3));
+      } else {
+        h.historico[date] = true;
+        addXP(h.xp); addMoedas(Math.round(h.xp/3));
+      }
+      checkAchievements(); saveState(); renderView();
+    });
+  });
+  document.querySelectorAll("[data-del-habit]").forEach(btn=>{
+    btn.addEventListener("click", ()=>{
+      state.habitos = state.habitos.filter(h=>h.id!==btn.dataset.delHabit);
+      saveState(); renderView();
+    });
+  });
+  document.querySelectorAll("[data-del-registro]").forEach(btn=>{
+    btn.addEventListener("click", ()=>{
+      const [tab,id] = btn.dataset.delRegistro.split(":");
+      state[tab] = state[tab].filter(x=>x.id!==id);
+      saveState(); renderView();
+    });
+  });
+  document.querySelectorAll("[data-regtab]").forEach(btn=>{
+    btn.addEventListener("click", ()=>{ registrosTab = btn.dataset.regtab; renderView(); });
+  });
+  document.querySelectorAll("[data-goto]").forEach(row=>{
+    row.addEventListener("click", ()=> setScreen(row.dataset.goto));
+  });
+  document.querySelectorAll("[data-back]").forEach(btn=>{
+    btn.addEventListener("click", ()=> setScreen("mais"));
+  });
+  const calPrev = document.querySelector("[data-cal-prev]");
+  const calNext = document.querySelector("[data-cal-next]");
+  if(calPrev) calPrev.addEventListener("click", ()=>{ calMonthOffset--; renderView(); });
+  if(calNext) calNext.addEventListener("click", ()=>{ calMonthOffset++; renderView(); });
+
+  document.querySelectorAll("[data-preset]").forEach(btn=>{
+    btn.addEventListener("click", ()=>{
+      if(pomodoro.running) return;
+      if(btn.dataset.preset==="custom"){
+        const v = prompt("Minutos personalizados:", pomodoro.presetMin);
+        const n = parseInt(v);
+        if(n && n>0){ pomodoro.presetMin=n; pomodoro.secondsLeft=n*60; }
+      } else {
+        pomodoro.presetMin = parseInt(btn.dataset.preset);
+        pomodoro.secondsLeft = pomodoro.presetMin*60;
+      }
+      renderView();
+    });
+  });
+  const timerToggle = document.getElementById("timer-toggle");
+  if(timerToggle) timerToggle.addEventListener("click", ()=>{
+    if(pomodoro.running){ clearInterval(pomodoro.intervalId); pomodoro.running=false; }
+    else { pomodoro.running=true; pomodoro.intervalId = setInterval(pomodoroTick, 1000); }
+    renderView();
+  });
+  const timerReset = document.getElementById("timer-reset");
+  if(timerReset) timerReset.addEventListener("click", ()=>{
+    clearInterval(pomodoro.intervalId); pomodoro.running=false; pomodoro.secondsLeft = pomodoro.presetMin*60; renderView();
+  });
+
+  const pNotif = document.getElementById("p-notif");
+  if(pNotif) pNotif.addEventListener("click", async ()=>{
+    if("Notification" in window){
+      const perm = await Notification.requestPermission();
+      state.notificacoesAtivas = perm==="granted";
+      saveState(); renderView();
+      if(perm==="granted") toast("Lembretes ativados");
+    } else toast("Notificações não suportadas neste navegador");
+  });
+  const pSalvar = document.getElementById("p-salvar");
+  if(pSalvar) pSalvar.addEventListener("click", ()=>{
+    state.profile = state.profile || {};
+    state.profile.nome = document.getElementById("p-nome").value.trim() || state.profile.nome;
+    state.profile.alturaCm = parseFloat(document.getElementById("p-altura").value)||state.profile.alturaCm;
+    state.profile.pesoDesejado = parseFloat(document.getElementById("p-pesodes").value)||state.profile.pesoDesejado;
+    saveState(); toast("Perfil salvo");
+  });
+  const pExportar = document.getElementById("p-exportar");
+  if(pExportar) pExportar.addEventListener("click", ()=>{
+    const blob = new Blob([JSON.stringify(state,null,2)], {type:"application/json"});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a"); a.href=url; a.download="devlife-dados.json"; a.click();
+    URL.revokeObjectURL(url);
+  });
+  const pApagar = document.getElementById("p-apagar");
+  if(pApagar) pApagar.addEventListener("click", ()=>{
+    if(confirm("Apagar todos os dados do DevLife deste dispositivo? Não pode ser desfeito.")){
+      state = defaultState();
+      try{ localStorage.removeItem(STORAGE_KEY); }catch(e){}
+      showOnboarding();
+    }
+  });
+}
+
+/* ---------------- FAB ---------------- */
+document.getElementById("fab-add").addEventListener("click", ()=>{
+  if(currentScreen==="habitos") modalNovoHabito();
+  else if(currentScreen==="registros") modalNovoRegistro();
+});
+
+/* ---------------- tema ---------------- */
+function applyTheme(){
+  document.documentElement.setAttribute("data-theme", state.tema);
+  document.getElementById("theme-toggle").textContent = state.tema==="dark" ? "◐" : "◑";
+  document.querySelector('meta[name="theme-color"]').setAttribute("content", state.tema==="dark"?"#12151C":"#F1F3EE");
+}
+document.getElementById("theme-toggle").addEventListener("click", ()=>{
+  state.tema = state.tema==="dark" ? "light" : "dark";
+  applyTheme(); saveState();
+});
+
+/* ---------------- onboarding ---------------- */
+function showOnboarding(){
+  document.getElementById("shell").style.display="none";
+  const wrap = document.createElement("div");
+  wrap.className="onb-wrap"; wrap.id="onb-wrap";
+  wrap.innerHTML = `
+    <div class="onb-mark"><i></i><i></i><i></i></div>
+    <div class="onb-title">Bem-vindo ao DevLife</div>
+    <div class="onb-sub">Hábitos de programação e saúde, estudo, treino e evolução — tudo num HUD só. Leva 30 segundos pra configurar.</div>
+    <div class="field"><label>Seu nome</label><input id="o-nome" placeholder="Como você quer ser chamado?"></div>
+    <div class="row">
+      <div class="field"><label>Altura (cm)</label><input id="o-altura" type="number" placeholder="170"></div>
+      <div class="field"><label>Peso atual (kg)</label><input id="o-peso" type="number" step="0.1" placeholder="70"></div>
+    </div>
+    <div class="field"><label>Peso desejado (kg) — opcional</label><input id="o-pesodes" type="number" step="0.1" placeholder="65"></div>
+    <div style="flex:1;"></div>
+    <button class="btn btn-primary btn-block" id="o-comecar">Começar</button>
+  `;
+  document.body.appendChild(wrap);
+  document.getElementById("o-comecar").addEventListener("click", ()=>{
+    const nome = document.getElementById("o-nome").value.trim() || "Dev";
+    const alturaCm = parseFloat(document.getElementById("o-altura").value)||null;
+    const pesoAtual = parseFloat(document.getElementById("o-peso").value)||null;
+    const pesoDesejado = parseFloat(document.getElementById("o-pesodes").value)||null;
+    state.profile = { nome, alturaCm, pesoAtual, pesoDesejado, criadoEm: todayStr() };
+    if(pesoAtual) state.pesos.push({ id:uid(), data:todayStr(), peso:pesoAtual });
+    saveState();
+    wrap.remove();
+    document.getElementById("shell").style.display="flex";
+    boot();
+  });
+}
+
+/* ---------------- boot ---------------- */
+function boot(){
+  applyTheme();
+  renderNav();
+  setScreen("dashboard");
+  if(!STORAGE_OK){
+    toast("Prévia sem gravação — hospede o arquivo pra salvar dados de verdade");
+  }
+}
+
+if(!state.profile){ showOnboarding(); }
+else { boot(); }
+
+if("serviceWorker" in navigator){
+  window.addEventListener("load", ()=>{
+    navigator.serviceWorker.register("sw.js").catch(()=>{ /* ok se falhar (ex.: file://) */ });
+  });
+}
+</script>
+</body>
+</html>
