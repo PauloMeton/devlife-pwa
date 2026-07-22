@@ -3,6 +3,7 @@ const CACHE_NAME = "devlife-v1";
 const APP_SHELL = [
   "./index.html",
   "./manifest.json",
+  "./icon.svg",
 ];
 
 self.addEventListener("install", (event) => {
