@@ -418,7 +418,7 @@ const NAV_ITEMS = [
   { id: "registros", label: "Registros", icon: "registros" },
   { id: "mais", label: "Mais", icon: "mais" },
 ];
-const MAIS_GROUP = ["mais", "calendario", "estatisticas", "revisao", "conquistas", "perfil"];
+const MAIS_GROUP = ["mais", "calendario", "estatisticas", "revisao", "conquistas", "historia", "perfil"];
 
 const CATEGORIA_HABITO = {
   "Programação": { tagClass: "prog", icones: ["💻","⌨️","🧠","🗂️","🐛","📦"] },
@@ -446,6 +446,7 @@ function defaultState(){
     tempoEstudadoPorDia:{}, tempoTreinadoPorDia:{}, xpLogPorDia:{},
     conquistasDesbloqueadas:[], notificacoesAtivas:false,
     revisoesSemanais:[], lembretesEnviados:{ dia:null, ids:[] },
+    capitulosDisponiveis:0, capitulosResgatados:[], capituloGanhoData:null,
   };
 }
 let STORAGE_OK = true;
@@ -585,6 +586,18 @@ function checkAchievements(){
   return novas;
 }
 
+function checkCapituloDesbloqueio(){
+  const hoje = todayStr();
+  if(state.capituloGanhoData===hoje) return;
+  const habitosHoje = state.habitos.filter(h => habitoAtivoNoDia(h, hoje));
+  if(habitosHoje.length===0) return;
+  const feitosHoje = habitosHoje.filter(h => h.historico && h.historico[hoje]).length;
+  if(feitosHoje < habitosHoje.length) return;
+  state.capituloGanhoData = hoje;
+  state.capitulosDisponiveis = (state.capitulosDisponiveis||0) + 1;
+  toast("📖 Capítulo desbloqueado! Vá em Mais → Capítulos da História.");
+}
+
 /* ---------------- roteador ---------------- */
 let currentScreen = "dashboard";
 let registrosTab = "estudos";
@@ -632,6 +645,7 @@ function renderView(){
   else if(currentScreen==="estatisticas") root.innerHTML = viewEstatisticas();
   else if(currentScreen==="revisao") root.innerHTML = viewRevisaoSemanal();
   else if(currentScreen==="conquistas") root.innerHTML = viewConquistas();
+  else if(currentScreen==="historia") root.innerHTML = viewHistoria();
   else if(currentScreen==="perfil") root.innerHTML = viewPerfil();
   bindViewEvents();
   document.getElementById("streak-pill").textContent = `🔥 ${computeStreak(state)}`;
@@ -895,11 +909,13 @@ function modalNovoRegistro(){
 
 /* ---- MAIS (menu) ---- */
 function viewMais(){
+  const disp = state.capitulosDisponiveis||0;
   const menu = [
     { id:"calendario", label:"Calendário", s:"Dias concluídos no mês" },
     { id:"estatisticas", label:"Estatísticas", s:"Peso, XP e horas ao longo do tempo" },
     { id:"revisao", label:"Revisão Semanal", s:"Como foi sua semana" },
     { id:"conquistas", label:"Conquistas", s:`${state.conquistasDesbloqueadas.length}/${ACHIEVEMENTS.length} desbloqueadas` },
+    { id:"historia", label:"Capítulos da História", s: disp>0 ? `🎁 ${disp} capítulo${disp>1?"s":""} pra resgatar!` : `${state.capitulosResgatados.length} capítulo${state.capitulosResgatados.length!==1?"s":""} salvo${state.capitulosResgatados.length!==1?"s":""}` },
     { id:"perfil", label:"Perfil e configurações", s:"Tema, dados, LGPD" },
   ];
   return `<h1 class="page-title">Mais</h1>
@@ -1085,6 +1101,35 @@ function viewConquistas(){
   `;
 }
 
+/* ---- CAPÍTULOS DA HISTÓRIA (recompensa) ---- */
+function viewHistoria(){
+  const disp = state.capitulosDisponiveis||0;
+  const salvos = [...(state.capitulosResgatados||[])].sort((a,b)=> b.numero-a.numero);
+  return `
+    ${subHeader("Capítulos da História")}
+    <div class="small-note" style="margin-bottom:12px;">Bata 100% da meta do dia num hábito programado pra hoje e ganhe 1 capítulo novo da sua HQ. Peça o roteiro + prompt de imagem pro Claude no chat, e cole aqui embaixo.</div>
+    <div class="card">
+      <div class="card-title">Resgatar capítulo</div>
+      ${disp>0 ? `<div class="freeze-note" style="margin-bottom:12px;">🎁 Você tem ${disp} capítulo${disp>1?"s":""} disponível${disp>1?"is":""} pra resgatar</div>` :
+        `<div class="small-note" style="margin-bottom:12px;">Nenhum capítulo disponível ainda. Complete a meta do dia pra ganhar um.</div>`}
+      <div class="field"><label>Número do capítulo</label><input id="hist-numero" type="number" min="1" value="${salvos.length? salvos[0].numero+1 : 8}"></div>
+      <div class="field"><label>Título</label><input id="hist-titulo" placeholder="Ex: A Hackathon"></div>
+      <div class="field"><label>Roteiro</label><textarea id="hist-roteiro" placeholder="Cole aqui o roteiro que o Claude escreveu..." style="min-height:140px;"></textarea></div>
+      <div class="field"><label>Prompt de imagem</label><textarea id="hist-prompt" placeholder="Cole aqui o prompt de imagem..."></textarea></div>
+      <button class="btn btn-primary btn-block" id="hist-salvar" ${disp<=0?"disabled":""}>Salvar capítulo${disp<=0?" (bata a meta do dia primeiro)":""}</button>
+    </div>
+    ${salvos.length>0 ? `
+    <div class="card-title" style="margin:18px 0 10px;">Arquivo (${salvos.length})</div>
+    ${salvos.map(c=>`
+      <div class="card">
+        <div class="card-title">Capítulo ${c.numero} — ${esc(c.titulo)}</div>
+        <div style="font-size:13.5px; line-height:1.6; white-space:pre-wrap;">${esc(c.roteiro)}</div>
+        <button class="btn btn-sm" style="margin-top:10px;" data-copy-prompt="${c.id}">Copiar prompt de imagem</button>
+      </div>
+    `).join("")}` : ""}
+  `;
+}
+
 /* ---- PERFIL ---- */
 function viewPerfil(){
   const p = state.profile || {};
@@ -1132,7 +1177,7 @@ function bindViewEvents(){
         h.historico[date] = true;
         addXP(h.xp); addMoedas(Math.round(h.xp/3));
       }
-      checkAchievements(); saveState(); renderView();
+      checkAchievements(); checkCapituloDesbloqueio(); saveState(); renderView();
     });
   });
   document.querySelectorAll("[data-del-habit]").forEach(btn=>{
@@ -1228,6 +1273,28 @@ function bindViewEvents(){
     if(idx>=0) state.revisoesSemanais[idx].nota = nota;
     else state.revisoesSemanais.push({ semana:inicioAtual, nota });
     saveState(); toast("Revisão salva!");
+  });
+  const histSalvar = document.getElementById("hist-salvar");
+  if(histSalvar) histSalvar.addEventListener("click", ()=>{
+    if((state.capitulosDisponiveis||0)<=0){ toast("Bata a meta do dia primeiro"); return; }
+    const numero = parseInt(document.getElementById("hist-numero").value)||((state.capitulosResgatados||[]).length+8);
+    const titulo = document.getElementById("hist-titulo").value.trim();
+    const roteiro = document.getElementById("hist-roteiro").value.trim();
+    const promptImagem = document.getElementById("hist-prompt").value.trim();
+    if(!titulo || !roteiro){ toast("Preencha ao menos título e roteiro"); return; }
+    state.capitulosResgatados = state.capitulosResgatados || [];
+    state.capitulosResgatados.push({ id:uid(), numero, titulo, roteiro, promptImagem, dataResgate: todayStr() });
+    state.capitulosDisponiveis = Math.max(0, (state.capitulosDisponiveis||0) - 1);
+    saveState(); renderView();
+    toast("📖 Capítulo salvo no arquivo!");
+  });
+  document.querySelectorAll("[data-copy-prompt]").forEach(btn=>{
+    btn.addEventListener("click", async ()=>{
+      const cap = (state.capitulosResgatados||[]).find(c=>c.id===btn.dataset.copyPrompt);
+      if(!cap || !cap.promptImagem){ toast("Sem prompt salvo pra esse capítulo"); return; }
+      try{ await navigator.clipboard.writeText(cap.promptImagem); toast("Prompt copiado!"); }
+      catch(e){ toast("Não deu pra copiar automaticamente — selecione o texto manualmente"); }
+    });
   });
 }
 
