@@ -271,6 +271,16 @@ h1.page-title{
 }
 .segmented button.active{ background:var(--accent); color:var(--accent-ink); }
 
+/* ============ DAY PICKER (frequência de hábito) ============ */
+.daypicker{ display:flex; gap:6px; }
+.daypicker button{
+  flex:1; aspect-ratio:1; border-radius:10px; border:1px solid var(--border);
+  background:var(--bg-elev); color:var(--text-dim); font-family:var(--font-display);
+  font-size:12px; cursor:pointer;
+}
+.daypicker button.active{ background:var(--accent); border-color:var(--accent); color:var(--accent-ink); font-weight:700; }
+.freeze-note{ display:flex; align-items:center; gap:6px; font-size:11.5px; color:var(--text-dim); margin:-4px 0 12px; }
+
 /* ============ TIMER ============ */
 .timer-ring-wrap{ display:flex; justify-content:center; margin:18px 0 8px; }
 .timer-display{ font-family:var(--font-display); font-size:52px; font-weight:700; text-align:center; letter-spacing:-0.02em; }
@@ -408,7 +418,7 @@ const NAV_ITEMS = [
   { id: "registros", label: "Registros", icon: "registros" },
   { id: "mais", label: "Mais", icon: "mais" },
 ];
-const MAIS_GROUP = ["mais", "calendario", "estatisticas", "conquistas", "perfil"];
+const MAIS_GROUP = ["mais", "calendario", "estatisticas", "revisao", "conquistas", "perfil"];
 
 const CATEGORIA_HABITO = {
   "Programação": { tagClass: "prog", icones: ["💻","⌨️","🧠","🗂️","🐛","📦"] },
@@ -435,6 +445,7 @@ function defaultState(){
     habitos:[], estudos:[], treinos:[], pesos:[], diario:[], alimentacao:[],
     tempoEstudadoPorDia:{}, tempoTreinadoPorDia:{}, xpLogPorDia:{},
     conquistasDesbloqueadas:[], notificacoesAtivas:false,
+    revisoesSemanais:[], lembretesEnviados:{ dia:null, ids:[] },
   };
 }
 let STORAGE_OK = true;
@@ -494,13 +505,54 @@ function diasAtivos(st){
   st.habitos.forEach(h => Object.keys(h.historico||{}).forEach(d => { if(h.historico[d]) set.add(d); }));
   return set;
 }
+const DIAS_SEMANA_ABREV = ["dom","seg","ter","qua","qui","sex","sáb"];
+function habitoAtivoNoDia(h, dateStr){
+  if(!h.frequencia || h.frequencia.length===0 || h.frequencia.length===7) return true;
+  const dow = new Date(dateStr+"T00:00:00").getDay();
+  return h.frequencia.includes(dow);
+}
+function resumoFrequencia(freq){
+  if(!freq || freq.length===0 || freq.length===7) return "Todo dia";
+  return [...freq].sort((a,b)=>a-b).map(d=>DIAS_SEMANA_ABREV[d]).join(", ");
+}
+function freezesDisponiveis(st){
+  return Math.min(2, Math.floor(diasAtivos(st).size / 7));
+}
 function computeStreak(st){
   const ativos = diasAtivos(st);
   if(ativos.size===0) return 0;
+  const freezes = freezesDisponiveis(st);
   let cursor = ativos.has(todayStr()) ? todayStr() : addDays(todayStr(),-1);
-  let count = 0;
-  while(ativos.has(cursor)){ count++; cursor = addDays(cursor,-1); }
+  let count = 0, gapsUsados = 0, seguranca = 0;
+  while(seguranca < 400){
+    seguranca++;
+    if(ativos.has(cursor)){ count++; cursor = addDays(cursor,-1); continue; }
+    if(gapsUsados < freezes){ gapsUsados++; cursor = addDays(cursor,-1); continue; }
+    break;
+  }
   return count;
+}
+function inicioSemana(dateStr){
+  const d = new Date(dateStr+"T00:00:00");
+  const dow = d.getDay();
+  const diff = (dow===0? -6 : 1-dow);
+  d.setDate(d.getDate()+diff);
+  return todayStr(d);
+}
+function projecaoPeso(st){
+  const ordenados = [...st.pesos].sort((a,b)=> a.data.localeCompare(b.data));
+  if(ordenados.length<2 || !st.profile?.pesoDesejado) return null;
+  const primeiro = ordenados[0], ultimo = ordenados[ordenados.length-1];
+  const dias = Math.round((new Date(ultimo.data) - new Date(primeiro.data)) / 86400000);
+  if(dias<=0) return null;
+  const taxaPorDia = (ultimo.peso - primeiro.peso) / dias;
+  const faltam = st.profile.pesoDesejado - ultimo.peso;
+  if(Math.abs(faltam) < 0.1) return { status:"chegou" };
+  if(Math.abs(taxaPorDia) < 0.005) return { status:"estavel" };
+  const mesmoSentido = (faltam>0 && taxaPorDia>0) || (faltam<0 && taxaPorDia<0);
+  if(!mesmoSentido) return { status:"contrario" };
+  const semanas = Math.max(1, Math.round(Math.abs(faltam/taxaPorDia)/7));
+  return { status:"ok", semanas };
 }
 function totalMinutosMapa(mapa){ return Object.values(mapa||{}).reduce((a,b)=>a+b,0); }
 function totalConclusoes(st){
@@ -578,6 +630,7 @@ function renderView(){
   else if(currentScreen==="mais") root.innerHTML = viewMais();
   else if(currentScreen==="calendario") root.innerHTML = viewCalendario();
   else if(currentScreen==="estatisticas") root.innerHTML = viewEstatisticas();
+  else if(currentScreen==="revisao") root.innerHTML = viewRevisaoSemanal();
   else if(currentScreen==="conquistas") root.innerHTML = viewConquistas();
   else if(currentScreen==="perfil") root.innerHTML = viewPerfil();
   bindViewEvents();
@@ -607,9 +660,10 @@ function viewDashboard(){
   const pesoAtual = state.pesos.length ? [...state.pesos].sort((a,b)=>b.data.localeCompare(a.data))[0].peso : (state.profile?.pesoAtual || null);
   const minEstudo = state.tempoEstudadoPorDia[hoje] || 0;
   const minTreino = state.tempoTreinadoPorDia[hoje] || 0;
-  const habitosHoje = state.habitos;
+  const habitosHoje = state.habitos.filter(h => habitoAtivoNoDia(h, hoje));
   const feitosHoje = habitosHoje.filter(h => h.historico && h.historico[hoje]).length;
   const pendentes = habitosHoje.filter(h => !(h.historico && h.historico[hoje]));
+  const freezes = freezesDisponiveis(state);
 
   return `
     <h1 class="page-title">Olá${state.profile? ", "+esc(state.profile.nome.split(" ")[0]) : ""} 👋</h1>
@@ -628,6 +682,7 @@ function viewDashboard(){
       <div class="statcard"><div class="v">${minutosParaHhMm(minEstudo)}</div><div class="l">Estudado hoje</div></div>
       <div class="statcard"><div class="v">${minutosParaHhMm(minTreino)}</div><div class="l">Treinado hoje</div></div>
     </div>
+    ${freezes>0 ? `<div class="freeze-note">🧊 ${freezes} congelamento${freezes>1?"s":""} protegendo sua sequência se você perder um dia</div>` : ""}
     <div class="card">
       <div class="card-title">Próximas tarefas</div>
       ${pendentes.length===0 ? `<div class="empty" style="padding:18px 8px;"><div class="glyph">✅</div><div class="t">Tudo em dia</div><div class="s">Nenhum hábito pendente hoje.</div></div>` :
@@ -639,12 +694,14 @@ function viewDashboard(){
 
 function habitRowHtml(h, dateStr){
   const done = !!(h.historico && h.historico[dateStr]);
+  const devidoHoje = habitoAtivoNoDia(h, dateStr);
   const cat = CATEGORIA_HABITO[h.categoria] || CATEGORIA_HABITO["Programação"];
-  return `<div class="habit-row">
+  return `<div class="habit-row" style="${devidoHoje?"":"opacity:0.55;"}">
     <button class="habit-check ${done?"done":""}" data-toggle-habit="${h.id}" data-date="${dateStr}">${done?ICONS.check:""}</button>
     <div class="habit-info">
       <div class="habit-name">${h.icone||"⭐"} ${esc(h.nome)}</div>
       <div class="habit-meta"><span class="tag ${cat.tagClass}">${h.categoria}</span><span class="habit-xp">+${h.xp} XP</span></div>
+      <div class="habit-meta" style="margin-top:3px;"><span class="tag">${resumoFrequencia(h.frequencia)}</span>${h.horario?`<span class="tag">⏰ ${h.horario}</span>`:""}${devidoHoje?"":`<span class="tag">não é hoje</span>`}</div>
     </div>
     <button class="habit-del" data-del-habit="${h.id}">${ICONS.trash}</button>
   </div>`;
@@ -673,6 +730,13 @@ function modalNovoHabito(){
     <div class="field"><label>Ícone</label>
       <select id="f-icone"></select>
     </div>
+    <div class="field">
+      <label>Frequência</label>
+      <div class="daypicker" id="f-freq">
+        ${DIAS_SEMANA_ABREV.map((d,i)=>`<button type="button" data-day="${i}" class="active">${d[0].toUpperCase()}</button>`).join("")}
+      </div>
+    </div>
+    <div class="field"><label>Horário (opcional — pra lembrete)</label><input id="f-horario" type="time"></div>
     <div class="field"><label>XP por conclusão</label><input id="f-xp" type="number" value="15" min="5" max="100" step="5"></div>
     <button class="btn btn-primary btn-block" id="f-salvar">Criar hábito</button>
   `);
@@ -681,11 +745,19 @@ function modalNovoHabito(){
   function fillIcons(){ iconSel.innerHTML = CATEGORIA_HABITO[catSel.value].icones.map(i=>`<option>${i}</option>`).join(""); }
   fillIcons();
   catSel.addEventListener("change", fillIcons);
+  document.querySelectorAll("#f-freq button").forEach(btn=>{
+    btn.addEventListener("click", ()=> btn.classList.toggle("active"));
+  });
   document.getElementById("f-salvar").addEventListener("click", ()=>{
     const nome = document.getElementById("f-nome").value.trim();
     if(!nome){ toast("Digite um nome pro hábito"); return; }
+    const diasSelecionados = Array.from(document.querySelectorAll("#f-freq button.active")).map(b=>parseInt(b.dataset.day));
+    if(diasSelecionados.length===0){ toast("Escolha pelo menos um dia"); return; }
+    const horario = document.getElementById("f-horario").value || null;
     state.habitos.push({
       id:uid(), nome, categoria:catSel.value, icone:iconSel.value,
+      frequencia: diasSelecionados.length===7 ? [] : diasSelecionados,
+      horario,
       xp: parseInt(document.getElementById("f-xp").value)||15,
       criadoEm: todayStr(), historico:{}
     });
@@ -826,6 +898,7 @@ function viewMais(){
   const menu = [
     { id:"calendario", label:"Calendário", s:"Dias concluídos no mês" },
     { id:"estatisticas", label:"Estatísticas", s:"Peso, XP e horas ao longo do tempo" },
+    { id:"revisao", label:"Revisão Semanal", s:"Como foi sua semana" },
     { id:"conquistas", label:"Conquistas", s:`${state.conquistasDesbloqueadas.length}/${ACHIEVEMENTS.length} desbloqueadas` },
     { id:"perfil", label:"Perfil e configurações", s:"Tema, dados, LGPD" },
   ];
@@ -922,12 +995,21 @@ function viewEstatisticas(){
   const dias14 = lastNDates(14);
   const xpPts = dias14.map(d=>({v: state.xpLogPorDia[d]||0}));
   const estudoPts = lastNDates(7).map(d=>({v: Math.round((state.tempoEstudadoPorDia[d]||0)/60*10)/10}));
+  const proj = projecaoPeso(state);
+  let projTexto = "";
+  if(proj){
+    if(proj.status==="chegou") projTexto = "🎯 Você já está na sua meta de peso.";
+    else if(proj.status==="estavel") projTexto = "Peso estável nos últimos registros — sem tendência clara ainda.";
+    else if(proj.status==="contrario") projTexto = "⚠️ O ritmo atual está te afastando da meta, não aproximando.";
+    else if(proj.status==="ok") projTexto = `📈 Nesse ritmo, você chega na meta em cerca de ${proj.semanas} semana${proj.semanas>1?"s":""}.`;
+  }
 
   return `
     ${subHeader("Estatísticas")}
     <div class="card">
       <div class="card-title">Peso (últimos registros)</div>
       <div class="chart-wrap">${lineChartSvg(pesos, "var(--accent-2)".includes("var")? "#FF7A59":"#FF7A59")}</div>
+      ${projTexto ? `<div class="small-note" style="margin-top:10px;">${projTexto}</div>` : (state.profile?.pesoDesejado ? `<div class="small-note" style="margin-top:10px;">Registre pelo menos 2 pesos pra ver a projeção até sua meta.</div>` : "")}
     </div>
     <div class="card">
       <div class="card-title">XP ganho por dia (14 dias)</div>
@@ -938,6 +1020,55 @@ function viewEstatisticas(){
       <div class="chart-wrap">${barChartSvg(estudoPts, "#4DA3FF")}</div>
       <div class="chart-legend"><span><i style="background:#4DA3FF"></i>horas</span></div>
     </div>
+  `;
+}
+
+/* ---- REVISÃO SEMANAL ---- */
+function viewRevisaoSemanal(){
+  const hoje = todayStr();
+  const inicioAtual = inicioSemana(hoje);
+  const dias7 = []; for(let i=0;i<7;i++) dias7.push(addDays(inicioAtual,i));
+
+  let minEstudo=0, minTreino=0, habitosFeitos=0, habitosEsperados=0;
+  dias7.forEach(d=>{
+    minEstudo += state.tempoEstudadoPorDia[d]||0;
+    minTreino += state.tempoTreinadoPorDia[d]||0;
+    state.habitos.forEach(h=>{
+      if(habitoAtivoNoDia(h,d)){
+        habitosEsperados++;
+        if(h.historico && h.historico[d]) habitosFeitos++;
+      }
+    });
+  });
+  const pesosSemana = state.pesos.filter(p=> dias7.includes(p.data)).sort((a,b)=>a.data.localeCompare(b.data));
+  const pesoInicio = pesosSemana[0]?.peso, pesoFim = pesosSemana[pesosSemana.length-1]?.peso;
+  const variacaoPeso = (pesoInicio!=null && pesoFim!=null) ? (pesoFim-pesoInicio) : null;
+
+  const revisoes = state.revisoesSemanais || [];
+  const existente = revisoes.find(r=>r.semana===inicioAtual);
+  const anteriores = [...revisoes].filter(r=>r.semana!==inicioAtual).sort((a,b)=>b.semana.localeCompare(a.semana)).slice(0,8);
+
+  return `
+    ${subHeader("Revisão Semanal")}
+    <div class="card">
+      <div class="card-title">Semana de ${fmtDataBR(inicioAtual)}</div>
+      <div class="statgrid">
+        <div class="statcard"><div class="v">${minutosParaHhMm(minEstudo)}</div><div class="l">Estudado</div></div>
+        <div class="statcard"><div class="v">${minutosParaHhMm(minTreino)}</div><div class="l">Treinado</div></div>
+        <div class="statcard accent"><div class="v">${habitosFeitos}/${habitosEsperados}</div><div class="l">Hábitos cumpridos</div></div>
+        <div class="statcard"><div class="v">${variacaoPeso!=null ? (variacaoPeso>=0?"+":"")+variacaoPeso.toFixed(1)+" kg" : "—"}</div><div class="l">Variação de peso</div></div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title">O que ajustar essa semana?</div>
+      <div class="field"><textarea id="rev-nota" placeholder="Ex: consegui manter o treino, mas preciso estudar mais cedo...">${esc(existente?.nota||"")}</textarea></div>
+      <button class="btn btn-primary btn-block" id="rev-salvar">Salvar revisão</button>
+    </div>
+    ${anteriores.length>0 ? `
+    <div class="card">
+      <div class="card-title">Revisões anteriores</div>
+      ${anteriores.map(r=>`<div class="log-item"><div><div class="log-main">Semana de ${fmtDataBR(r.semana)}</div><div class="log-sub">${esc((r.nota||"(sem nota)").slice(0,90))}</div></div></div>`).join("")}
+    </div>` : ""}
   `;
 }
 
@@ -1088,6 +1219,16 @@ function bindViewEvents(){
       showOnboarding();
     }
   });
+  const revSalvar = document.getElementById("rev-salvar");
+  if(revSalvar) revSalvar.addEventListener("click", ()=>{
+    const inicioAtual = inicioSemana(todayStr());
+    const nota = document.getElementById("rev-nota").value.trim();
+    state.revisoesSemanais = state.revisoesSemanais || [];
+    const idx = state.revisoesSemanais.findIndex(r=>r.semana===inicioAtual);
+    if(idx>=0) state.revisoesSemanais[idx].nota = nota;
+    else state.revisoesSemanais.push({ semana:inicioAtual, nota });
+    saveState(); toast("Revisão salva!");
+  });
 }
 
 /* ---------------- FAB ---------------- */
@@ -1140,7 +1281,29 @@ function showOnboarding(){
   });
 }
 
-/* ---------------- boot ---------------- */
+/* ---------------- lembretes por horário ---------------- */
+function checkHabitReminders(){
+  if(!state.notificacoesAtivas) return;
+  if(!("Notification" in window) || Notification.permission!=="granted") return;
+  const hoje = todayStr();
+  if(!state.lembretesEnviados || state.lembretesEnviados.dia!==hoje){
+    state.lembretesEnviados = { dia: hoje, ids: [] };
+  }
+  const now = new Date();
+  const hhmm = String(now.getHours()).padStart(2,"0")+":"+String(now.getMinutes()).padStart(2,"0");
+  let mudou = false;
+  state.habitos.forEach(h=>{
+    if(!h.horario || h.horario!==hhmm) return;
+    if(!habitoAtivoNoDia(h, hoje)) return;
+    if(h.historico && h.historico[hoje]) return;
+    if(state.lembretesEnviados.ids.includes(h.id)) return;
+    try{ new Notification("DevLife", { body: `Hora de: ${h.nome}`, icon:"icon.svg" }); }catch(e){}
+    state.lembretesEnviados.ids.push(h.id);
+    mudou = true;
+  });
+  if(mudou) saveState();
+}
+
 function boot(){
   applyTheme();
   renderNav();
@@ -1148,6 +1311,8 @@ function boot(){
   if(!STORAGE_OK){
     toast("Prévia sem gravação — hospede o arquivo pra salvar dados de verdade");
   }
+  checkHabitReminders();
+  setInterval(checkHabitReminders, 20000);
 }
 
 if(!state.profile){ showOnboarding(); }
