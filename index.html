@@ -1123,8 +1123,12 @@ function viewHistoria(){
     ${salvos.map(c=>`
       <div class="card">
         <div class="card-title">Capítulo ${c.numero} — ${esc(c.titulo)}</div>
+        ${c.imagemUrl ? `<img src="${c.imagemUrl}" style="width:100%;border-radius:var(--radius-md);margin-bottom:10px;display:block;" alt="Ilustração do capítulo ${c.numero}">` : ""}
         <div style="font-size:13.5px; line-height:1.6; white-space:pre-wrap;">${esc(c.roteiro)}</div>
-        <button class="btn btn-sm" style="margin-top:10px;" data-copy-prompt="${c.id}">Copiar prompt de imagem</button>
+        <div class="row" style="margin-top:10px;">
+          <button class="btn btn-sm" data-gen-image="${c.id}">${c.imagemUrl?"🔄 Gerar de novo":"🎨 Gerar imagem"}</button>
+          <button class="btn btn-sm" data-copy-prompt="${c.id}">Copiar prompt</button>
+        </div>
       </div>
     `).join("")}` : ""}
   `;
@@ -1294,6 +1298,27 @@ function bindViewEvents(){
       if(!cap || !cap.promptImagem){ toast("Sem prompt salvo pra esse capítulo"); return; }
       try{ await navigator.clipboard.writeText(cap.promptImagem); toast("Prompt copiado!"); }
       catch(e){ toast("Não deu pra copiar automaticamente — selecione o texto manualmente"); }
+    });
+  });
+  document.querySelectorAll("[data-gen-image]").forEach(btn=>{
+    btn.addEventListener("click", ()=>{
+      const cap = (state.capitulosResgatados||[]).find(c=>c.id===btn.dataset.genImage);
+      if(!cap || !cap.promptImagem){ toast("Esse capítulo não tem prompt de imagem salvo"); return; }
+      const originalText = btn.textContent;
+      btn.textContent = "Gerando..."; btn.disabled = true;
+      const seed = Math.floor(Math.random()*1000000);
+      const url = `https://image.pollinations.ai/prompt/${encodeURIComponent(cap.promptImagem)}?width=768&height=1024&seed=${seed}&nologo=true`;
+      const img = new Image();
+      img.onload = ()=>{
+        cap.imagemUrl = url;
+        saveState(); renderView();
+        toast("🎨 Imagem gerada!");
+      };
+      img.onerror = ()=>{
+        btn.textContent = originalText; btn.disabled = false;
+        toast("Não rolou gerar automático agora — use 'Copiar prompt' e cole no ChatGPT/Midjourney");
+      };
+      img.src = url;
     });
   });
 }
